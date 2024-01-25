@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Port Information</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+<label for="data-count">Show data count:</label>
+<input type="number" id="data-count" value="10" min="5" max="100" step="5" onchange="updateDataCount(this.value)">
+<h2>Bar Chart</h2>
+<div id="bar-chart"></div>
+<script>
+    function drawChart(data) {
+        var currentDataCount = parseInt(document.getElementById('data-count').value);
+        var slicedData = data.slice(0, currentDataCount);
+        var labels = slicedData.map(function(entry) {
+            return "(" + entry.input_port.toString() + ', ' + entry.output_port.toString() + ")";
+        });
+
+        var numbers = slicedData.map(function(entry) {
+            return entry.number;
+        });
+
+        var plotData = [{
+            x: labels,
+            y: numbers,
+            type: 'bar'
+        }];
+
+        var plotLayout = {
+            title: 'Port Information',
+            xaxis: {
+                title: 'Port (Input Port, Output Port)',
+            },
+            yaxis: {
+                title: 'Number'
+            },
+            margin: {
+                b: 150 
+            }
+        };
+
+        Plotly.newPlot('bar-chart', plotData, plotLayout);
+    }
+
+    drawChart({{ data_mongo | safe }});
+</script>
+<h2>Data Overview</h2>
+<table id="data-table">
+    <thead>
+        <tr>
+            <th>Input Port</th>
+            <th>Output Port</th>
+            <th>Number</th>
+        </tr>
+    </thead>
+    <tbody id="table-body">
+    </tbody>
+</table>
+<script>
+    function updateTable(data) {
+        var currentDataCount = parseInt(document.getElementById('data-count').value);
+        var tableBody = document.getElementById('table-body');
+
+        tableBody.innerHTML = '';
+
+        data.slice(0, currentDataCount).forEach(function(entry) {
+            var row = document.createElement('tr');
+
+            var inputPortCell = document.createElement('td');
+            inputPortCell.textContent = entry.input_port;
+            row.appendChild(inputPortCell);
+
+            var outputPortCell = document.createElement('td');
+            outputPortCell.textContent = entry.output_port;
+            row.appendChild(outputPortCell);
+
+            var numberCell = document.createElement('td');
+            numberCell.textContent = entry.number;
+            row.appendChild(numberCell);
+
+            tableBody.appendChild(row);
+        });
+    }
+    var initialData = {{ data_mongo | safe }};
+
+    updateTable(initialData);
+</script>
+
+<script>
+    var currentDataCount = parseInt(document.getElementById('data-count').value);
+    var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+    function updateWebsite() {
+        // console.log('Updating website...');
+        socket.emit('get_update');
+    }
+
+    setInterval(function() {
+        updateWebsite();
+    }, 1000);
+
+    socket.on('update_data', function(data) {
+        // console.log(data)
+        updateTable(data);
+        drawChart(data);
+    });
+    var currentDataCount = parseInt(document.getElementById('data-count').value);
+
+    function updateDataCount(count) {
+        currentDataCount = parseInt(count);
+        updateWebsite();
+    }
+</script>
+</body>
+</html>
